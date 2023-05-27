@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.fftpack
 from PyQt6.QtGui import QVector3D
+from VmdWriter import VmdBoneFrame
 
 """ Lifting from the Deepでの番号
 # jointの番号と説明 (3Dの番号, 2Dの番号, 説明)
@@ -61,15 +62,23 @@ NAMES = {
 
 # -----------------------------------------------------------------
 # QVector3Dへコンバート
-def convert(pose_3d):
-    positions = {}
+def convert(pose_3d, pose_2d):
+    positions = {
+        'position': {},
+        'extends': {}
+    }
     if not pose_3d:
         return positions
     
     # TODO: Multi person support
     poses = pose_3d[0]
+    position = {}
     for idx, pose in enumerate(poses):
-        positions[NAMES[idx]] = QVector3D(pose.x, pose.y*-1, pose.z)
+        position[NAMES[idx]] = QVector3D(pose.x, pose.y*-1, pose.z)
+
+    positions['position'] = position
+    positions['extends'][NAMES[23]] = pose_2d[0][23]
+    positions['extends'][NAMES[24]] = pose_2d[0][24]
 
     return positions
 
@@ -112,11 +121,12 @@ def smooth_position(positions_list):
         return
 
     joint = []
-    for i in range(0, 33):
+    for i, _ in enumerate(NAMES):
         joint.append([[], [], []])
 
-    for pos in positions_list:
-        for i in range(0, 33):
+    for info in positions_list:
+        pos = info['position']
+        for i, _ in enumerate(NAMES):
             if len(pos) < i + 1:
                 joint[i][0].append(None)
                 joint[i][1].append(None)
@@ -126,25 +136,24 @@ def smooth_position(positions_list):
                 joint[i][1].append(pos[NAMES[i]].y())
                 joint[i][2].append(pos[NAMES[i]].z())
 
-    for i in range(0, 33):
+    for i, _ in enumerate(NAMES):
         for j in range(0, 3):
             interpolate(joint[i][j])
             #lowpass_filter(joint[i][j])
                                    
     for i in range(0, total_length):
-        positions_list[i] = {}
-        for j in range(0, 33):
+        for j, _ in enumerate(NAMES):
             p = QVector3D(joint[j][0][i], joint[j][1][i], joint[j][2][i])
-            positions_list[i][NAMES[j]] = p
+            positions_list[i]['position'][NAMES[j]] = p
             
             
 def normalize_for_vmd(positions_list):
-    center_offset = QVector3D(0, 0, 0)
     spine_len = 0
-    ground_y = float("inf")
+    ground_y = float('inf')
     count = 0
-    for pos in positions_list:
-        if len(pos) < 33:
+    for info in positions_list:
+        pos = info['position']
+        if len(pos) < len(NAMES):
             continue
         if pos['right_ankle'].y() < ground_y: # 右足首
             ground_y = pos['right_ankle'].y()
@@ -156,17 +165,18 @@ def normalize_for_vmd(positions_list):
         # 腰の座標 右のヒップと左のヒップの中間とする
         waist = (pos['right_hip'] + pos['left_hip']) / 2
         
-        center_offset += waist # 7:胴体の中心 8:首の付け根
-        spine_len = spine_len + (neck - waist).length() # 
+        spine_len = spine_len + (neck - waist).length()
         count += 1
 
-    center_offset /= count
+    if not count:
+        return
+
     spine_len /= count
     scale = 3.2 / spine_len
 
-    for pos in positions_list:
+    for info in positions_list:
+        pos = info['position']
         for key in pos:
-            #p -= center_offset
             pos[key] *= scale
 
 def refine(positions_list):
@@ -176,10 +186,26 @@ def refine(positions_list):
 
 
 # -----------------------------------------------------------------
+# 位置補正
+def center(positions, frames, frame_num):
+    # left_hip, right_hip
+    p2d = positions['extends']
+    x = (p2d['left_hip'].x + p2d['right_hip'].x) / 2
+    y = (p2d['left_hip'].y + p2d['right_hip'].y) / 2
+    # 0.5, 0.5がセンターとする
+    x -= 0.5
+    y -= 0.5
+    
+    bf = VmdBoneFrame()
+    bf.name = 'センター'
+    bf.frame = frame_num
+    bf.position = QVector3D(x*22.5, y*-22.5, 0)
+    frames.append(bf)
+
+
+# -----------------------------------------------------------------
 # 解析したポーズのダンプ
-def dump(pose_2d, pose_3d):
-    print(pose_2d)
-    print(pose_3d)
+def dump(pose_3d, pose_2d):
     for p2d, p3d in zip(pose_2d, pose_3d):
         print('-' * 60)
         print('NAME, 説明, Visibility, X(2D), Y(2D), X(3D), Y(3D), Z(3D)')

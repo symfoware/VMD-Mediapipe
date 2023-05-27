@@ -3,7 +3,7 @@
 from PyQt6.QtGui import QQuaternion, QVector3D
 from VmdWriter import VmdBoneFrame, VmdInfoIk, VmdShowIkFrame
 
-def positions_to_frames(pos, frame_num=0, center_enabled=False):
+def positions_to_frames(pos, frame_num=0):
     """convert positions to bone frames"""
     frames = []
 

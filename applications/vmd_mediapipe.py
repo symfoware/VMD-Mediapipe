@@ -65,8 +65,8 @@ def vmd_convert(image_file, vmd_file, center_enabled=False):
             frame_num += 1
             continue
     
-        #ps.dump(pose_2d, pose_3d)
-        positions = ps.convert(pose_3d)
+        #ps.dump(pose_3d, pose_2d)
+        positions = ps.convert(pose_3d, pose_2d)
         #adjust_center(pose_2d, positions, image)
         positions_list.append(positions)
         
@@ -84,7 +84,10 @@ def vmd_convert(image_file, vmd_file, center_enabled=False):
         if positions is None:
             frame_num += 1
             continue
-        frames = pos2vmd.positions_to_frames(positions, frame_num, center_enabled)
+        frames = pos2vmd.positions_to_frames(positions['position'], frame_num)
+        if center_enabled:
+            ps.center(positions, frames, frame_num)
+
         bone_frames.extend(frames)
         frame_num += 1
 
@@ -105,7 +108,8 @@ if __name__ == '__main__':
     vmd_convert(arg.IMAGE_FILE, arg.VMD_FILE, arg.center)
 
     # ex)
-    # python3 applications/vmd_mediapipe.py applications/debug/b71_01.jpg applications/debug/test.vmd
+    # python3 applications/vmd_mediapipe.py applications/debug/pose.jpg applications/debug/test.vmd
+    # python3 applications/vmd_mediapipe.py applications/debug/dummy.png applications/debug/test.vmd
     # python3 applications/vmd_mediapipe.py applications/debug/sample.mp4 applications/debug/test.vmd
     
 
