@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 #
-# vmdlifting.py - estimate 3D pose by Mediapipe, and convert the pose data to VMD
+# vmd_mediapipe.py - estimate 3D pose by Mediapipe, and convert the pose data to VMD
 #
 
 def usage(prog):
@@ -8,16 +8,15 @@ def usage(prog):
     sys.exit()
 
 
+import argparse
 import os
 import cv2
 import mediapipe as mp
 
-from pos2vmd import positions_to_frames, make_showik_frames, convert_position
 from VmdWriter import VmdWriter
-from refine_position import refine_position
-from adjust_center import adjust_center
-#from dump_positions import dump_positions
-import argparse;
+#from adjust_center import adjust_center
+import posisions as ps
+import pos2vmd
 
 DIR_PATH = os.path.dirname(os.path.realpath(__file__))
 PROJECT_PATH = os.path.realpath(DIR_PATH + '/..')
@@ -57,7 +56,6 @@ def vmd_convert(image_file, vmd_file, center_enabled=False):
             pose_landmarker_result = landmarker.detect_for_video(mp_image, int((frame_num / fps) * 1000))
         except Exception as ex:
             frame_num +=1
-            print('error')
             print(ex)
             continue
 
@@ -67,31 +65,30 @@ def vmd_convert(image_file, vmd_file, center_enabled=False):
             frame_num += 1
             continue
     
-        #dump_positions(pose_2d, pose_3d)
-        positions = convert_position(pose_3d)
+        #ps.dump(pose_2d, pose_3d)
+        positions = ps.convert(pose_3d)
         #adjust_center(pose_2d, positions, image)
         positions_list.append(positions)
         
-        print("frame_num: ", frame_num)
+        print('frame_num: ', frame_num)
         frame_num += 1
         
         
     # close model
     landmarker.close()
-
     
-    #refine_position(positions_list)
+    ps.refine(positions_list)
     bone_frames = []
     frame_num = 0
     for positions in positions_list:
         if positions is None:
             frame_num += 1
             continue
-        bf = positions_to_frames(positions, frame_num, center_enabled)
-        bone_frames.extend(bf)
+        frames = pos2vmd.positions_to_frames(positions, frame_num, center_enabled)
+        bone_frames.extend(frames)
         frame_num += 1
 
-    showik_frames = make_showik_frames()
+    showik_frames = pos2vmd.make_showik_frames()
     writer = VmdWriter()
     writer.write_vmd_file(vmd_file, bone_frames, showik_frames)
     

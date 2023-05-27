@@ -11,8 +11,9 @@ class VmdBoneFrame():
         self.rotation = QQuaternion()
 
     def write(self, fout):
-        fout.write(self.name)
-        fout.write(bytearray([0 for i in range(len(self.name), 15)])) # ボーン名15Byteの残りを\0で埋める
+        name = self.name.encode('ms932')
+        fout.write(name)
+        fout.write(bytearray([0 for i in range(len(name), 15)])) # ボーン名15Byteの残りを\0で埋める
         fout.write(struct.pack('<L', self.frame))
         fout.write(struct.pack('<f', self.position.x()))
         fout.write(struct.pack('<f', self.position.y()))
@@ -40,8 +41,9 @@ class VmdShowIkFrame():
         fout.write(struct.pack('b', self.show))
         fout.write(struct.pack('<L', len(self.ik)))
         for k in (self.ik):
-            fout.write(k.name)
-            fout.write(bytearray([0 for i in range(len(k.name), 20)])) # IKボーン名20Byteの残りを\0で埋める
+            name = k.name.encode('ms932')
+            fout.write(name)
+            fout.write(bytearray([0 for i in range(len(name), 20)])) # IKボーン名20Byteの残りを\0で埋める
             fout.write(struct.pack('b', k.onoff))
         
 class VmdWriter():
@@ -50,7 +52,7 @@ class VmdWriter():
 
     def write_vmd_file(self, filename, bone_frames, showik_frames):
         """Write VMD data to a file"""
-        fout = open(filename, "wb")
+        fout = open(filename, 'wb')
         # header
         fout.write(b'Vocaloid Motion Data 0002\x00\x00\x00\x00\x00')
         fout.write(b'Dummy Model Name    ')
