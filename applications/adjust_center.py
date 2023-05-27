@@ -1,11 +1,8 @@
-# -*- coding: utf-8 -*-
-#
 # adjust_center.py - adjust center position
 
-from __future__ import print_function
 import numpy as np
 import cv2
-from PyQt5.QtGui import QVector3D
+from PyQt6.QtGui import QVector3D
 
 center_idx = 7
 idx_2d = [0, 1, 2, 3, 4, 5, 6, 7]

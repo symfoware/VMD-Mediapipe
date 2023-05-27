@@ -10,17 +10,10 @@ if ! [ -x "$(command -v git)" ]; then
 fi
 
 echo 'Downloading models...'
-${WGET} http://visual.cs.ucl.ac.uk/pubs/liftingFromTheDeep/res/init_session.tar.gz
-${WGET} http://visual.cs.ucl.ac.uk/pubs/liftingFromTheDeep/res/prob_model.tar.gz
-
-echo 'Extracting models...'
-tar -xvzf init_session.tar.gz
-tar -xvzf prob_model.tar.gz
-rm -rf init_session.tar.gz
-rm -rf prob_model.tar.gz
+${WGET} https://storage.googleapis.com/mediapipe-models/pose_landmarker/pose_landmarker_full/float16/latest/pose_landmarker_full.task
 cd ../..
 
 echo 'Installing dependencies...'
-pip3 install scikit-image
+pip install -r requirements.txt
 
 echo 'Done'

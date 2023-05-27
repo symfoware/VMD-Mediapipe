@@ -1,12 +1,8 @@
-# -*- coding: utf-8 -*-
-#
 # refine_position.py - refine bone position data
 
-from __future__ import print_function
 import numpy as np
 from scipy.fftpack import fft, ifft, fftfreq
-from PyQt5.QtGui import QVector3D
-import matplotlib.pyplot as plt
+from PyQt6.QtGui import QVector3D
 
 def interpolate(vec):
     last_index = None
@@ -97,4 +93,4 @@ def normalize_for_vmd(positions_list):
 
 def refine_position(positions_list):
     smooth_position(positions_list)
-    normalize_for_vmd(positions_list)
+    #normalize_for_vmd(positions_list)

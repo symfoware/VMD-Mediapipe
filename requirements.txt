@@ -1,4 +1,4 @@
-tensorflow-gpu
+mediapipe
 opencv-python
-PyQt5
+PyQt6
 scikit-image

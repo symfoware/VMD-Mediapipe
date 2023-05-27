@@ -1,52 +1,150 @@
-# Lifting from the Deep
-Denis Tome', Chris Russell, Lourdes Agapito
+# VMD-Lifting
+VMD-Lifting is a fork of 'Lifting from the Deep' that outputs estimated 3D pose data to a VMD file
 
-[Lifting from the Deep: Convolutional 3D Pose Estimation from a Single Image](http://openaccess.thecvf.com/content_cvpr_2017/papers/Tome_Lifting_From_the_CVPR_2017_paper.pdf), CVPR 2017
+The authers of 'Lifting from the Deep' are Denis Tome', Chris Russell and Lourdes Agapito.
+Please refer 'README-original.md' and http://visual.cs.ucl.ac.uk/pubs/liftingFromTheDeep/
+for more information about the original 'Lifting from the Deep'.
 
-This project is licensed under the terms of the GNU GPLv3 license. By using the software, you are agreeing to the terms of the license agreement ([link](https://github.com/DenisTome/Lifting-from-the-Deep-release/blob/master/LICENSE)).
+This project is licensed under the terms of the GNU GPLv3 license. By using the software,
+you are agreeing to the terms of the license agreement (see LICENSE file).
 
-![Teaser?](https://github.com/DenisTome/Lifting-from-the-Deep-release/blob/master/data/images/teaser-github.png)
-## Abstract
+## 概要
 
-We propose a unified formulation for the problem of 3D human pose estimation from a single raw RGB image
-that reasons jointly about 2D joint estimation and 3D pose reconstruction to improve both tasks. We take an integrated
-approach that fuses probabilistic knowledge of 3D human pose with a multi-stage CNN architecture and uses
-the knowledge of plausible 3D landmark locations to refine the search for better 2D locations. The entire process is
-trained end-to-end, is extremely efficient and obtains stateof-the-art results on Human3.6M outperforming previous
-approaches both on 2D and 3D errors.
+写真から人のポーズを推定し、VMDフォーマットのモーション(ポーズ)データを出力するプログラムです。
+ポーズ推定には Lifting from the Deep (https://github.com/DenisTome/Lifting-from-the-Deep-release)
+のプログラムを使用しています。
 
-## Dependencies
+## お試し
 
-The code is compatible with python2.7
-- [Tensorflow 1.0](https://www.tensorflow.org/)
+とりあえず使ってみたい方のために [Docker image](https://hub.docker.com/r/errnommd/vmd-lifting) を用意しました。
+[Docker](https://www.docker.com/) がインストールされたPCで、例えば C:\test_photo に写真ファイルを置き、
+Windows Powershell で次のコマンドを実行します。
+写真は全身が写ったものを選んでください。ファイル名は例えば test1.jpg とします。
+
+```
+docker run -v c:\test_photo:/vmdl/test -it errnommd/vmd-lifting:latest
+```
+
+コンテナとファイルを共有するため、認証のダイアログが出ます。
+ファイアウォールを通す設定が必要なこともあります。
+なお、Docker imageが約2GBあるので、ダウンロードに時間がかかります。
+"root@(文字列):/#" のように書かれたコマンドプロンプトが出たら準備完了です。
+下記の手順で VMD-Lifting を実行します(先頭の#は入力しない)。
+
+```
+# cd /vmdl/applications
+# python3 vmdlifting.py ../test/test1.jpg ../test/test1.vmd
+```
+
+次のようなメッセージが表示され、C:\test_photo に test1.vmd が作られます。
+この VMD ファイルを MMD に読ませましょう。
+
+```
+pose estimation start
+...
+(略)
+...
+frame_num:  0
+root@.......:/vmdl/applications#
+
+```
+
+終了するときは exit と入力します。
+
+以上のように Docker で使い続けることもできますが、Docker版はGPUを使わない設定になっているので遅いです。
+本格的に使用したい場合は、下記の手順でインストールを行い、GPUを有効にして使うことをお勧めします。
+
+## VMD-Liftingの実行に必要なパッケージ
+- python (3.x)
+- [Tensorflow](https://www.tensorflow.org/)
 - [OpenCV](http://opencv.org/)
+- python-tk (Tkinter)
+- PyQt5
 
-## Models
+## Linuxでのパッケージインストール手順
 
-For this demo, CPM's caffe-models trained on the MPI datasets ([link](https://github.com/shihenw/convolutional-pose-machines-release/tree/master/model)) are used for **2D pose estimation**, whereas for **3D pose estimation** our probabilistic 3D pose model is trained on the [Human3.6M dataset](http://vision.imar.ro/human3.6m/description.php).
+Ubuntu や Debian GNU/Linux の環境では、rootになって下記のコマンドを実行すると必要なものが揃います。
 
-## Testing
-- First, run `setup.sh` to retreive the trained models and to install the external utilities.
-- Run `demo.py` to evaluate the test image.
+```
+# apt-get install python3-pip
+# pip3 install tensorflow-gpu
+# apt-get install python3-opencv
+# apt-get install python3-tk
+# apt-get install python3-pyqt5
+# apt-get install cmake
+```
 
-## Additional material
-- Project [webpage](http://visual.cs.ucl.ac.uk/pubs/liftingFromTheDeep/)
-- Some [videos](https://youtu.be/tKfkGttx0qs).
+古いLinuxでは apt-get install python3-opencv が失敗することがあります。その場合、代わりに下記を実行します。
 
-## Citation
+```
+# pip3 install opencv-python
+```
 
-	@InProceedings{Tome_2017_CVPR,
-	author = {Tome, Denis and Russell, Chris and Agapito, Lourdes},
-	title = {Lifting From the Deep: Convolutional 3D Pose Estimation From a Single Image},
-	booktitle = {The IEEE Conference on Computer Vision and Pattern Recognition (CVPR)},
-	month = {July},
-	year = {2017}
-	}
+## Windowsでのパッケージインストール手順
 
-## Notes
+Windowsの場合は次の手順で必要なものをインストールします。
 
-The models provided for the demo are NOT the ones that have been used to generate results for the paper. We are still in the process of converting all the code.
+- cygwin をインストール: https://cygwin.com/install.html
 
-## References
+- https://www.tensorflow.org/install/install_windows に従って、CUDA、cuDNN、Python 3.6 をインストール
 
-- [Convolutional Pose Machines (CPM)](https://github.com/shihenw/convolutional-pose-machines-release).
+- cygwin の pythonでなく、上記でインストールしたpythonを使うように環境変数PATHを設定
+
+- tensorflowをpipでインストール
+
+`$ pip install  tensorflow-gpu`
+
+- OpenCVをインストール
+
+`$ pip install opencv-python`
+
+- PyQt5をインストール
+
+`$ pip install PyQt5`
+
+## VMD-Liftingのセットアップ
+
+- VMD-Liftingのアーカイブを展開して(あるいはgit cloneして)できたディレクトリに入り、setup.sh を実行します。
+このスクリプトは必要なデータを取得し、外部ユーティリティをインストールします。
+- (次に、Lifting from the Deep 本体の動作を確認したい場合は、application ディレクトリで demo.py を実行します。)
+
+## 使用方法
+
+application ディレクトリに入って vmdlifting.py を実行します。
+コマンドライン引数として入力元画像/動画ファイル名と出力先VMDファイル名を指定します。
+
+使用例:
+
+```
+./vmdlifting.py ../data/images/photo.jpg estimated.vmd
+```
+```
+./vmdlifting.py movie.mp4 motion.vmd
+```
+
+コマンドライン引数とオプション:
+
+```
+usage: vmdlifting.py [-h] [--center] IMAGE_FILE VMD_FILE
+```
+
+- IMAGE_FILE: 入力元画像/動画ファイル名(JPEG, PNG, MP4など)
+- VMD_FILE: 出力先VMDファイル名
+- -h オプションでヘルプメッセージが表示されます
+- --center オプションを付けると、出力されるVMDファイルにセンターボーンの位置が追加されます。(現状まだ不安定です)
+
+## Lifting from the Deep について
+
+Lifting from the Deep は、畳み込みニューラルネットワーク(CNN)を用いて、
+単一のRGB画像から3Dのポーズ推定を行う手法(の論文)および、それを実装したプログラムです。
+著者は Denis Tome', Chris Russell, Lourdes Agapito です。
+詳しくはプロジェクトのWebページ ( http://visual.cs.ucl.ac.uk/pubs/liftingFromTheDeep/ )
+の論文や動画を参照してください。
+
+## ライセンスについて
+(はじめに英語で書いたとおり)GNU GPLv3 licenseです。詳しくはLICENSEファイルを読んでください。
+
+## 参考文献
+
+D. Tome, C. Russell and L. Agapito. Lifting from the Deep: Convolutional 3D Pose Estimation
+from a Single Image. In IEEE Conference on Computer Vision and Pattern Recognition (CVPR), 2017

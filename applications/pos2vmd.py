@@ -1,180 +1,186 @@
-# -*- coding: utf-8 -*-
-#
 # pos2vmd.py - convert joint position data to VMD
 
-from __future__ import print_function
-
-from PyQt5.QtGui import QQuaternion, QVector3D
+from PyQt6.QtGui import QQuaternion, QVector3D
 from VmdWriter import VmdBoneFrame, VmdInfoIk, VmdShowIkFrame
 
-def positions_to_frames(pos, vis, frame_num=0, center_enabled=False, head_rotation=None):
+def positions_to_frames(pos, frame_num=0, center_enabled=False, head_rotation=None):
     """convert positions to bone frames"""
     frames = []
-    if len(pos) < 17:
-        return frames
-    
-    # センター
-    if center_enabled:
-        bf = VmdBoneFrame()
-        bf.name = b'\x83\x5a\x83\x93\x83\x5e\x81\x5b' # 'センター'
-        bf.frame = frame_num
-        bf.position = pos[7]
-        frames.append(bf)
+
+    # 解析結果から直接得られない座標の推定
+    # 首の座標 右肩と左肩の中間とする
+    neck = (pos['right_shoulder'] + pos['left_shoulder']) / 2
+    # 腰の座標 右のヒップと左のヒップの中間とする
+    waist = (pos['right_hip'] + pos['left_hip']) / 2
+    # 頭の中心座標
+    head_center = (pos['right_ear'] + pos['left_ear']) / 2
 
     # 上半身
     bf = VmdBoneFrame()
     bf.name = b'\x8f\xe3\x94\xbc\x90\x67' # '上半身'
     bf.frame = frame_num
-    direction = pos[8] - pos[7]
-    up = QVector3D.crossProduct(direction, (pos[14] - pos[11])).normalized()
+    
+    direction = neck - waist # 首の付け根 - 腰
+    up = QVector3D.crossProduct(direction, (pos['right_shoulder'] - pos['left_shoulder'])).normalized() # 右肩 左肩
     upper_body_orientation = QQuaternion.fromDirection(direction, up)
     initial = QQuaternion.fromDirection(QVector3D(0, 1, 0), QVector3D(0, 0, 1))
     bf.rotation = upper_body_orientation * initial.inverted()
     frames.append(bf)
     upper_body_rotation = bf.rotation
-    
+
     # 下半身
     bf = VmdBoneFrame()
     bf.name = b'\x89\xba\x94\xbc\x90\x67' # '下半身'
     bf.frame = frame_num
-    direction = pos[0] - pos[7]
-    up = QVector3D.crossProduct(direction, (pos[4] - pos[1]))
+    direction = waist - neck # 腰 - 首の付け根
+    up = QVector3D.crossProduct(direction, (pos['left_hip'] - pos['right_hip']))
     lower_body_orientation = QQuaternion.fromDirection(direction, up)
     initial = QQuaternion.fromDirection(QVector3D(0, -1, 0), QVector3D(0, 0, 1))
     bf.rotation = lower_body_orientation * initial.inverted()
     lower_body_rotation = bf.rotation
     frames.append(bf)
 
+
     # 首は回転させず、頭のみ回転させる
     # 頭
     bf = VmdBoneFrame()
     bf.name = b'\x93\xaa' # '頭'
     bf.frame = frame_num
-    if head_rotation is None:
-        # direction = pos[10] - pos[9]
-        direction = pos[10] - pos[8]
-        up = QVector3D.crossProduct((pos[9] - pos[8]), (pos[10] - pos[9]))
-        orientation = QQuaternion.fromDirection(direction, up)
-        initial_orientation = QQuaternion.fromDirection(QVector3D(0, 1, 0), QVector3D(1, 0, 0))
-        rotation = orientation * initial_orientation.inverted()
-        bf.rotation = upper_body_rotation.inverted() * rotation
-    else:
-        bf.rotation = upper_body_rotation.inverted() * head_rotation
+    # 頭頂は右耳、左耳の中間座標で代価
+    # あごは回転角が知りたいだけなので、鼻で判定
+    direction = head_center - neck
+    up = QVector3D.crossProduct((pos['nose'] - neck), (head_center - pos['nose']))
+    orientation = QQuaternion.fromDirection(direction, up)
+    initial_orientation = QQuaternion.fromDirection(QVector3D(0, 1, 0), QVector3D(1, 0, 0))
+    rotation = orientation * initial_orientation.inverted()
+    bf.rotation = upper_body_rotation.inverted() * rotation
     frames.append(bf)
-        
+
+
+    # -------------------------------------------------------------------------------------------------
+    # 上半身左
+    # -------------------------------------------------------------------------------------------------
     # 左腕
     bf = VmdBoneFrame()
     bf.name = b'\x8d\xb6\x98\x72' # '左腕'
     bf.frame = frame_num
-    direction = pos[12] - pos[11]
-    up = QVector3D.crossProduct((pos[12] - pos[11]), (pos[13] - pos[12]))
+    direction = pos['left_elbow'] - pos['left_shoulder'] # 左ひじ - 左肩
+    up = QVector3D.crossProduct((pos['left_elbow'] - pos['left_shoulder']), (pos['left_wrist'] - pos['left_elbow'])) # 左ひじ - 左肩, 左手首 - 左ひじ
     orientation = QQuaternion.fromDirection(direction, up)
-    initial_orientation = QQuaternion.fromDirection(QVector3D(1.73, -1, 0), QVector3D(1, 1.73, 0))
+    # ボーンの初期状態による　手を45度下向きにしている場合はx:1を指定
+    #initial_orientation = QQuaternion.fromDirection(QVector3D(1.73, -1, 0), QVector3D(1, 1.73, 0))
+    initial_orientation = QQuaternion.fromDirection(QVector3D(1, -1, 0), QVector3D(1, 1, 0))
     rotation = orientation * initial_orientation.inverted()
     # 左腕ポーンの回転から親ボーンの回転を差し引いてbf.rotationに格納する。
     # upper_body_rotation * bf.rotation = rotation なので、
     bf.rotation = upper_body_rotation.inverted() * rotation
     left_arm_rotation = bf.rotation # 後で使うので保存しておく
-    if vis[6]: # 左ひじが見えているなら
-        frames.append(bf)
+    frames.append(bf)
     
     # 左ひじ
     bf = VmdBoneFrame()
     bf.name = b'\x8d\xb6\x82\xd0\x82\xb6' # '左ひじ'
     bf.frame = frame_num
-    direction = pos[13] - pos[12]
-    up = QVector3D.crossProduct((pos[12] - pos[11]), (pos[13] - pos[12]))
+    direction = pos['left_wrist'] - pos['left_elbow'] #左手首 - 左ひじ
+    up = QVector3D.crossProduct((pos['left_elbow'] - pos['left_shoulder']), (pos['left_wrist'] - pos['left_elbow'])) # 左ひじ - 左肩, 左手首 - 左ひじ
+
     orientation = QQuaternion.fromDirection(direction, up)
-    initial_orientation = QQuaternion.fromDirection(QVector3D(1.73, -1, 0), QVector3D(1, 1.73, 0))
+    initial_orientation = QQuaternion.fromDirection(QVector3D(1, -1, 0), QVector3D(1, 1, 0))
     rotation = orientation * initial_orientation.inverted()
     # 左ひじポーンの回転から親ボーンの回転を差し引いてbf.rotationに格納する。
     # upper_body_rotation * left_arm_rotation * bf.rotation = rotation なので、
     bf.rotation = left_arm_rotation.inverted() * upper_body_rotation.inverted() * rotation
     # bf.rotation = (upper_body_rotation * left_arm_rotation).inverted() * rotation # 別の表現
-    if vis[6] and vis[7]: # 左ひじと左手首が見えているなら
-        frames.append(bf)
+    frames.append(bf)
 
-    
+
+    # -------------------------------------------------------------------------------------------------
+    # 上半身右
+    # -------------------------------------------------------------------------------------------------
     # 右腕
     bf = VmdBoneFrame()
     bf.name = b'\x89\x45\x98\x72' # '右腕'
     bf.frame = frame_num
-    direction = pos[15] - pos[14]
-    up = QVector3D.crossProduct((pos[15] - pos[14]), (pos[16] - pos[15]))
+    direction = pos['right_elbow'] - pos['right_shoulder'] # 右ひじ - 右肩
+    up = QVector3D.crossProduct((pos['right_elbow'] - pos['right_shoulder']), (pos['right_wrist'] - pos['right_elbow'])) # 右ひじ - 右肩, 右手首 - 右ひじ
     orientation = QQuaternion.fromDirection(direction, up)
-    initial_orientation = QQuaternion.fromDirection(QVector3D(-1.73, -1, 0), QVector3D(1, -1.73, 0))
+    initial_orientation = QQuaternion.fromDirection(QVector3D(-1, -1, 0), QVector3D(1, -1, 0))
     rotation = orientation * initial_orientation.inverted()
     bf.rotation = upper_body_rotation.inverted() * rotation
     right_arm_rotation = bf.rotation
-    if vis[3]: # 右ひじが見えているなら
-        frames.append(bf)
+    frames.append(bf)
     
     # 右ひじ
     bf = VmdBoneFrame()
     bf.name = b'\x89\x45\x82\xd0\x82\xb6' # '右ひじ'
     bf.frame = frame_num
-    direction = pos[16] - pos[15]
-    up = QVector3D.crossProduct((pos[15] - pos[14]), (pos[16] - pos[15]))
+    direction = pos['right_wrist'] - pos['right_elbow'] # 右手首 - 右ひじ
+    up = QVector3D.crossProduct((pos['right_elbow'] - pos['right_shoulder']), (pos['right_wrist'] - pos['right_elbow'])) # 右ひじ - 右肩, 右手首 - 右ひじ
     orientation = QQuaternion.fromDirection(direction, up)
-    initial_orientation = QQuaternion.fromDirection(QVector3D(-1.73, -1, 0), QVector3D(1, -1.73, 0))
+    initial_orientation = QQuaternion.fromDirection(QVector3D(-1, -1, 0), QVector3D(1, -1, 0))
     rotation = orientation * initial_orientation.inverted()
     bf.rotation = right_arm_rotation.inverted() * upper_body_rotation.inverted() * rotation
-    if vis[3] and vis[4]: # 右ひじと右手首が見えているなら
-        frames.append(bf)
+    frames.append(bf)
 
+
+    # -------------------------------------------------------------------------------------------------
+    # 下半身左
+    # -------------------------------------------------------------------------------------------------
     # 左足
     bf = VmdBoneFrame()
     bf.name = b'\x8d\xb6\x91\xab' # '左足'
     bf.frame = frame_num
-    direction = pos[5] - pos[4]
-    up = QVector3D.crossProduct((pos[5] - pos[4]), (pos[6] - pos[5]))
+    direction = pos['left_knee'] - pos['left_hip'] # 左ひざ - 左脚付け根
+    up = QVector3D.crossProduct((pos['left_knee'] - pos['left_hip']), (pos['left_ankle'] - pos['left_knee'])) # 左ひざ - 左脚付け根, 左足首 - 左ひざ
+
     orientation = QQuaternion.fromDirection(direction, up)
     initial_orientation = QQuaternion.fromDirection(QVector3D(0, -1, 0), QVector3D(-1, 0, 0))
     rotation = orientation * initial_orientation.inverted()
     bf.rotation = lower_body_rotation.inverted() * rotation
     left_leg_rotation = bf.rotation
-    if vis[12]: # 左ひざが見えているなら
-        frames.append(bf)
+    frames.append(bf)
     
     # 左ひざ
     bf = VmdBoneFrame()
     bf.name = b'\x8d\xb6\x82\xd0\x82\xb4' # '左ひざ'
     bf.frame = frame_num
-    direction = pos[6] - pos[5]
-    up = QVector3D.crossProduct((pos[5] - pos[4]), (pos[6] - pos[5]))
+    direction = pos['left_ankle'] - pos['left_knee'] # 左足首 - 左ひざ
+    up = QVector3D.crossProduct((pos['left_knee'] - pos['left_hip']), (pos['left_ankle'] - pos['left_knee'])) # 左ひざ - 左脚付け根, 左足首 - 左ひざ
     orientation = QQuaternion.fromDirection(direction, up)
     initial_orientation = QQuaternion.fromDirection(QVector3D(0, -1, 0), QVector3D(-1, 0, 0))
     rotation = orientation * initial_orientation.inverted()
     bf.rotation = left_leg_rotation.inverted() * lower_body_rotation.inverted() * rotation
-    if vis[12] and vis[13]: # 左ひざと左足首が見えているなら
-        frames.append(bf)
+    frames.append(bf)
+    
 
+    # -------------------------------------------------------------------------------------------------
+    # 下半身右
+    # -------------------------------------------------------------------------------------------------
     # 右足
     bf = VmdBoneFrame()
     bf.name = b'\x89\x45\x91\xab' # '右足'
     bf.frame = frame_num
-    direction = pos[2] - pos[1]
-    up = QVector3D.crossProduct((pos[2] - pos[1]), (pos[3] - pos[2]))
+    direction = pos['right_knee'] - pos['right_hip'] # 右ひざ - 右脚付け根
+    up = QVector3D.crossProduct((pos['right_knee'] - pos['right_hip']), (pos['right_ankle'] - pos['right_knee'])) # 右ひざ - 右脚付け根, 右足首 - 右ひざ
     orientation = QQuaternion.fromDirection(direction, up)
     initial_orientation = QQuaternion.fromDirection(QVector3D(0, -1, 0), QVector3D(-1, 0, 0))
     rotation = orientation * initial_orientation.inverted()
     bf.rotation = lower_body_rotation.inverted() * rotation
     right_leg_rotation = bf.rotation
-    if vis[9]: # 右ひざが見えているなら
-        frames.append(bf)
+    frames.append(bf)
     
     # 右ひざ
     bf = VmdBoneFrame()
     bf.name = b'\x89\x45\x82\xd0\x82\xb4' # '右ひざ'
     bf.frame = frame_num
-    direction = pos[3] - pos[2]
-    up = QVector3D.crossProduct((pos[2] - pos[1]), (pos[3] - pos[2]))
+    direction = pos['right_ankle'] - pos['right_knee'] # 右足首 - 右ひざ
+    up = QVector3D.crossProduct((pos['right_knee'] - pos['right_hip']), (pos['right_ankle'] - pos['right_knee'])) # 右ひざ - 右脚付け根, 右足首 - 右ひざ
     orientation = QQuaternion.fromDirection(direction, up)
     initial_orientation = QQuaternion.fromDirection(QVector3D(0, -1, 0), QVector3D(-1, 0, 0))
     rotation = orientation * initial_orientation.inverted()
     bf.rotation = right_leg_rotation.inverted() * lower_body_rotation.inverted() * rotation
-    if vis[9] and vis[10]: # 右ひざと右足首が見えているなら
-        frames.append(bf)
+    frames.append(bf)
+    
 
     return frames
 
@@ -189,15 +195,51 @@ def make_showik_frames():
     frames.append(sf)
     return frames
 
+POSE_NAMES = {
+    0: 'nose',
+    1: 'left_eye_inner',
+    2: 'left_eye',
+    3: 'left_eye_outer',
+    4: 'right_eye_inner',
+    5: 'right_eye',
+    6: 'right_eye_outer',
+    7: 'left_ear',
+    8: 'right_ear',
+    9: 'mouth_left',
+    10: 'mouth_right',
+    11: 'left_shoulder',
+    12: 'right_shoulder',
+    13: 'left_elbow',
+    14: 'right_elbow',
+    15: 'left_wrist',
+    16: 'right_wrist',
+    17: 'left_pinky',
+    18: 'right_pinky',
+    19: 'left_index',
+    20: 'right_index',
+    21: 'left_thumb',
+    22: 'right_thumb',
+    23: 'left_hip',
+    24: 'right_hip',
+    25: 'left_knee',
+    26: 'right_knee',
+    27: 'left_ankle',
+    28: 'right_ankle',
+    29: 'left_heel',
+    30: 'right_heel',
+    31: 'left_foot_index',
+    32: 'right_foot_index',
+}
+
 def convert_position(pose_3d):
-    positions = []
-    if pose_3d is None:
+    positions = {}
+    if not pose_3d:
         return positions
     
     # TODO: Multi person support
-    pose = pose_3d[0]
-    for j in range(pose.shape[1]):
-        q = QVector3D(pose[0, j], pose[2, j], pose[1, j])
-        positions.append(q)
+    poses = pose_3d[0]
+    for idx, pose in enumerate(poses):
+        positions[POSE_NAMES[idx]] = QVector3D(pose.x, pose.y*-1, pose.z)
+
     return positions
 

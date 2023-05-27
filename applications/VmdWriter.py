@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import struct
-from PyQt5.QtGui import QQuaternion, QVector3D
+from PyQt6.QtGui import QQuaternion, QVector3D
 
 class VmdBoneFrame():
     def __init__(self):
